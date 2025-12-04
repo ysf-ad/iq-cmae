@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pth
+*.pt
+*.sigmf-data
+*.sigmf-meta
+.DS_Store
+.vscode/
+outputs/
+data/ne-data/
+data/italysig/
+data/IQ_recordings/
+wandb/
