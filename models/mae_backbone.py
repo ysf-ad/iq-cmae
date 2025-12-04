@@ -3,8 +3,12 @@
 # All rights reserved.
 # --------------------------------------------------------
 # MAE backbone implementation for IQ-CMAE.
-# Extracted and simplified from the original MAE implementation: https://github.com/facebookresearch/mae
-#
+# --------------------------------------------------------
+# References:
+# MAE: https://github.com/facebookresearch/mae
+# timm: https://github.com/rwightman/pytorch-image-models
+# DeiT: https://github.com/facebookresearch/deit
+# --------------------------------------------------------
 # Simplifications and Modifications:
 # 1. Removed local definitions of `Block`, `Attention`, and `Mlp` in favor of `timm.models.vision_transformer` implementations.
 # 2. Removed local `get_2d_sincos_pos_embed` logic in favor of shared `iq_cmae.models.pos_embed` utility.
