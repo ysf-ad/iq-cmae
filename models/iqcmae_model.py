@@ -11,7 +11,7 @@ from .modules import TransformerBlock, FeatureDecoder, NonLinearNeck
 class IQCMAE(MaskedAutoencoderViT):
     """
     IQCMAE: Multi-modal Contrastive Masked Autoencoder for IQ Data.
-    Implements "Proper Fusion" (Mid-Fusion) and "Contrastive Gradient Stopping" (Last-K).
+    Implements Mid-Fusion and Contrastive Gradient Stopping (Last-K).
     """
     def __init__(self,
                  img_size=224, patch_size=16, in_chans=6,
@@ -50,7 +50,7 @@ class IQCMAE(MaskedAutoencoderViT):
         self.fusion_type = fusion_type
 
         # --------------------------------------------------------------------------
-        # Proper Fusion Architecture Setup
+        # Architecture Setup
         # --------------------------------------------------------------------------
         # 1. Separate Embeddings
         # Constellation (3 channels)

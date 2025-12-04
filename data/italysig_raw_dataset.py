@@ -38,6 +38,7 @@ class ItalySigRawDataset(Dataset):
         seed: int = 42,
         modality_mask: Optional[str] = None,
         cache_dir: Optional[str] = None,
+        split: str = "train", # train, val, test, or all
         class_map: Optional[Dict[str, int]] = None,
     ):
         self.data_root = data_root
@@ -71,9 +72,12 @@ class ItalySigRawDataset(Dataset):
         self.cache = DataCache(cache_dir)
 
         # Discover Samples
-        self.samples = self._discover_samples(data_root)
+        all_samples = self._discover_samples(data_root)
         
-        # Subset Sampling
+        # Apply Stratified Split
+        self.samples = self._apply_stratified_split(all_samples, split, seed)
+        
+        # Subset Sampling (after split, for debugging/small scale)
         if subset_ratio < 1.0:
             rng = np.random.default_rng(seed)
             indices = rng.choice(len(self.samples), size=int(len(self.samples) * subset_ratio), replace=False)
@@ -81,6 +85,48 @@ class ItalySigRawDataset(Dataset):
 
         # Class Mapping
         self._build_class_map(class_map)
+
+    def _apply_stratified_split(self, samples: List[Dict[str, Any]], split: str, seed: int) -> List[Dict[str, Any]]:
+        """Apply stratified 70/15/15 split based on label."""
+        if split == "all":
+            return samples
+            
+        # Group by label
+        grouped = {}
+        for s in samples:
+            grouped.setdefault(s['label_str'], []).append(s)
+            
+        # Sort for determinism
+        for k in grouped:
+            grouped[k].sort(key=lambda x: x['file_path'])
+            
+        selected_samples = []
+        for label, group in grouped.items():
+            n = len(group)
+            if n == 0: continue
+            
+            # Stable shuffle
+            group_seed = seed + hash(label) % (2**32)
+            rng = np.random.default_rng(group_seed)
+            indices = np.arange(n)
+            rng.shuffle(indices)
+            
+            n_train = int(round(n * 0.70))
+            n_val = int(round(n * 0.15))
+            
+            if split == "train":
+                subset_indices = indices[:n_train]
+            elif split == "val":
+                subset_indices = indices[n_train:n_train+n_val]
+            elif split == "test":
+                subset_indices = indices[n_train+n_val:]
+            else:
+                raise ValueError(f"Unknown split: {split}")
+                
+            for i in subset_indices:
+                selected_samples.append(group[i])
+                
+        return selected_samples
 
     def _discover_samples(self, root: str) -> List[Dict[str, Any]]:
         """Recursively find all .sigmf-data files."""

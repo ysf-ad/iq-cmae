@@ -110,9 +110,9 @@ def main(args):
             subset_ratio=args.subset_ratio,
             modality_mask="constellation+gaf+spectrogram",
             cache_dir=args.cache_dir,
-            seed=args.seed
+            seed=args.seed,
+            split="train"
         )
-        # For validation, we use the same dataset but maybe a different split if available
         # For validation, we use the same dataset structure
         dataset_val = ItalySigRawDataset(
             data_root=args.data_path,
@@ -122,7 +122,8 @@ def main(args):
             subset_ratio=args.subset_ratio,
             modality_mask="constellation+gaf+spectrogram",
             cache_dir=args.cache_dir,
-            seed=args.seed + 1 # Different seed
+            seed=args.seed, # Same seed for consistent splitting
+            split="val"
         )
         
     else:
@@ -189,7 +190,7 @@ def main(args):
     )
 
     # Model Configuration
-    model = CorrectedProperCMAE(
+    model = IQCMAE(
         img_size=args.input_size,
         patch_size=16,
         in_chans=6,

@@ -138,12 +138,14 @@ def main(args):
         train_ds = ItalySigRawDataset(
             data_root=args.data_path, image_size=224,
             subset_ratio=SUBSET_RATIO, seed=42,
-            modality_mask="constellation+gaf+spectrogram"
+            modality_mask="constellation+gaf+spectrogram",
+            split="train"
         )
         test_ds = ItalySigRawDataset(
             data_root=args.data_path, image_size=224,
-            subset_ratio=SUBSET_RATIO, seed=43,
-            modality_mask="constellation+gaf+spectrogram"
+            subset_ratio=SUBSET_RATIO, seed=42,
+            modality_mask="constellation+gaf+spectrogram",
+            split="test"
         )
         train_datasets.append(train_ds)
         test_datasets.append(test_ds)
