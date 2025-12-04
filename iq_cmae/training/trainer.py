@@ -2,8 +2,9 @@ import os
 import torch
 import torch.nn as nn
 from typing import Optional, Dict, Any, Tuple
+from utils.iq_extractor import extract_iq_data
 
-class Trainer:
+class IQCMAE_Trainer:
     """
     Trainer class for IQ-CMAE models.
     Handles training loop, validation, and checkpointing.

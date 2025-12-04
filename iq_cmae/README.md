@@ -95,6 +95,15 @@ This codebase supports the datasets detailed and referenced in the paper:
     }
     ```
 
-2.  **ITALYSIG**: Also detailed and referenced in the paper.
+2.  **ITALYSIG**: 
+    ```bibtex
+    @online{italysig,
+      author       = {L. M. Monteforte and L. Chiaraviglio},
+      title        = {ITALYSIG: Open National Database of I/Q Captures},
+      year         = {2024},
+      url          = {https://italysig.netgroup.uniroma2.it/s/pkjdnMiKMkXQwCe},
+      note         = {Accessed: Jul. 11, 2025}
+    }
+    ```
 
 *Note: This repository contains only the code. Please refer to the paper for data access.*

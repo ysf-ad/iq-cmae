@@ -3,21 +3,15 @@ import torch.nn as nn
 import numpy as np
 from functools import partial
 from typing import Optional, List, Dict, Any, Tuple
-
 from .mae_backbone import MaskedAutoencoderViT
 from .pos_embed import get_2d_sincos_pos_embed
 from timm.models.vision_transformer import PatchEmbed
 from .modules import TransformerBlock, FeatureDecoder, NonLinearNeck
 
-class CorrectedProperCMAE(MaskedAutoencoderViT):
+class IQCMAE(MaskedAutoencoderViT):
     """
-    Corrected Proper CMAE Model
-    
-    Implements 'Proper Fusion' (Mid-Fusion) architecture:
-    1. Split Input (Constellation, GAF, Spectrogram)
-    2. Separate Embeddings & Modality-Specific Encoders
-    3. Fusion (Concat + Project)
-    4. Shared Encoder (with Last-K extraction)
+    IQCMAE: Multi-modal Contrastive Masked Autoencoder for IQ Data.
+    Implements "Proper Fusion" (Mid-Fusion) and "Contrastive Gradient Stopping" (Last-K).
     """
     def __init__(self,
                  img_size=224, patch_size=16, in_chans=6,
@@ -117,7 +111,7 @@ class CorrectedProperCMAE(MaskedAutoencoderViT):
         pass
 
     def forward_contrastive(self, x1, x2):
-        """InfoNCE (NT-Xent) contrastive loss calculation."""
+        """InfoNCE contrastive loss calculation."""
         z1 = self.projector(x1)
         z2 = self.projector(x2)
         
@@ -216,7 +210,7 @@ class CorrectedProperCMAE(MaskedAutoencoderViT):
         loss_contrastive = torch.tensor(0.0, device=imgs.device)
         if noisy_imgs is not None:
              # Contrastive pass
-             # We only need contrastive features (top-K gradients)
+             # Only use contrastive features (top-K gradients)
              _, _, _, latent_noisy_contrastive = self.forward_encoder(noisy_imgs, mask_ratio=0.0, gradient_stopping=True)
              
              z1 = latent_contrastive[:, 0]
