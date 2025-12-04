@@ -52,6 +52,17 @@ python train.py \
 *   `--contrastive_last_k`: Top layers updated by contrastive loss (default: `4`).
 *   `--shared_layers`: Number of shared encoder layers (default: `9`).
 
+### Linear Probing / Evaluation
+
+To evaluate the pre-trained model:
+
+1.  **Load Weights**: Load the pre-trained encoder weights.
+2.  **Freeze Encoder**: Freeze all encoder parameters.
+3.  **Train Classifier**: Train a linear classifier (e.g., a single Linear layer) on top of the encoder's CLS token output.
+4.  **Datasets**: Use the standard training/test splits for NE-Data or ITALYSIG as described in the paper.
+
+*Note: The `train.py` script is currently configured for pre-training. For evaluation, you can adapt the script to load weights and run a supervised training loop on the classifier head only.*
+
 ## Architecture Details
 
 **Input**: $224 \times 224 \times 6$ image split into:
