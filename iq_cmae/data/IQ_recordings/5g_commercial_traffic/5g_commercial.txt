@@ -1,0 +1,5 @@
+FREQUENCY: 3.589 GHz
+BW: 20 MHz
+Type: 5G commercial traffic
+Duration: 20 msec
+

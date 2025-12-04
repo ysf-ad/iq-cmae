@@ -1,0 +1,4 @@
+FREQUENCY: 3.469 GHz
+BW: 60 MHz MHz
+Type: 5G BS with traffic and SSB
+Duration: 20 msec

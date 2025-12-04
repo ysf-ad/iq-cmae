@@ -1,0 +1,30 @@
+# Data
+ne-data/
+zold-data/
+*.sigmf-data
+*.sigmf-meta
+
+# Outputs
+outputs/
+checkpoints/
+logs/
+*.pth
+*.png
+*.json
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+.cursor/
+.cursorignore
+
+# Archive
+research_archive/
+_archive/

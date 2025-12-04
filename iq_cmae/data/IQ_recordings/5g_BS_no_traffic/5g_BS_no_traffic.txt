@@ -1,0 +1,4 @@
+FREQUENCY: 3.467 GHz
+BW: 59.58  MHz
+Type: 5G FR1 BS no traffic
+Duration: 20 msec

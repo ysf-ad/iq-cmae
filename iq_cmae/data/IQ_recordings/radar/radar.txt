@@ -1,0 +1,4 @@
+FREQUENCY: 9.376 GHz
+BW: 9.862 MHz
+Type: radar
+Duration: 20 msec
