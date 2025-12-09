@@ -67,7 +67,13 @@ class IQCMAE(MaskedAutoencoderViT):
         self.pos_embed_spec = nn.Parameter(torch.zeros(1, num_patches, embed_dim), requires_grad=False)
 
         # 2. Modality-Specific Blocks
-        self.modality_specific_depth = depth - shared_layers
+        # 2. Modality-Specific Blocks
+        # Fair Parameter Count: Split the "unshared" depth among modalities
+        # Target: Total depth L=12. S=9 shared. 3 remaining. 
+        # Each modality gets 3 // 3 = 1 block.
+        # Total blocks = 1*3 (private) + 9 (shared) = 12.
+        self.num_modalities = 3
+        self.modality_specific_depth = (depth - shared_layers) // self.num_modalities
         self.shared_depth = shared_layers
         
         self.modality_blocks = nn.ModuleList([
