@@ -56,6 +56,8 @@ def get_args_parser():
                         help='dataset path')
     parser.add_argument('--output_dir', default='./outputs/train_run',
                         help='path where to save, empty for no saving')
+    parser.add_argument('--label_depth', default=1, type=int,
+                        help='Depth of label folder (1=parent, 2=grandparent)')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=42, type=int)
@@ -111,7 +113,8 @@ def main(args):
             modality_mask="constellation+gaf+spectrogram",
             cache_dir=args.cache_dir,
             seed=args.seed,
-            split="train"
+            split="train",
+            label_depth=args.label_depth
         )
         # For validation, we use the same dataset structure
         dataset_val = ItalySigRawDataset(
@@ -123,7 +126,8 @@ def main(args):
             modality_mask="constellation+gaf+spectrogram",
             cache_dir=args.cache_dir,
             seed=args.seed, # Same seed for consistent splitting
-            split="val"
+            split="val",
+            label_depth=args.label_depth
         )
         
     else:

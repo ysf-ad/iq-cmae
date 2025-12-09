@@ -140,6 +140,31 @@ class IQCMAE(MaskedAutoencoderViT):
         
         return loss
 
+    def generate_shared_mask(self, x, mask_ratio):
+        """
+        Generate a mask shared across modalities.
+        x: [B, N, D]
+        """
+        N, L, D = x.shape  # batch, length, dim
+        len_keep = int(L * (1 - mask_ratio))
+        
+        noise = torch.rand(N, L, device=x.device)  # noise in [0, 1]
+        
+        # sort noise for each sample
+        ids_shuffle = torch.argsort(noise, dim=1)  # ascend: small is keep, large is remove
+        ids_restore = torch.argsort(ids_shuffle, dim=1)
+
+        # keep the first subset
+        ids_keep = ids_shuffle[:, :len_keep]
+        
+        # generate the binary mask: 0 is keep, 1 is remove
+        mask = torch.ones([N, L], device=x.device)
+        mask[:, :len_keep] = 0
+        # unshuffle to get the binary mask
+        mask = torch.gather(mask, dim=1, index=ids_restore)
+
+        return ids_keep, mask, ids_restore
+
     def forward_encoder(self, x, mask_ratio, gradient_stopping=False):
         # 1. Split Input
         # x: [B, 6, H, W] -> Constellation (3), GAF (2), Spectrogram (1)
@@ -151,19 +176,31 @@ class IQCMAE(MaskedAutoencoderViT):
         x_c = self.patch_embed_const(x_const) + self.pos_embed_const
         x_g = self.patch_embed_gaf(x_gaf) + self.pos_embed_gaf
         x_s = self.patch_embed_spec(x_spec) + self.pos_embed_spec
+        
+        # 3. Masking (Applied before modality blocks)
+        # We generate ONE shared mask pattern for alignment
+        if mask_ratio > 0:
+            ids_keep, mask, ids_restore = self.generate_shared_mask(x_c, mask_ratio)
+            
+            # Apply mask to each modality
+            # x_c: [B, L, D] -> [B, len_keep, D]
+            x_c = torch.gather(x_c, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, x_c.shape[-1]))
+            x_g = torch.gather(x_g, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, x_g.shape[-1]))
+            x_s = torch.gather(x_s, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, x_s.shape[-1]))
+        else:
+            # For contrastive branch with mask_ratio=0 (or testing)
+            mask = torch.zeros((x_c.shape[0], x_c.shape[1]), device=x.device)
+            ids_restore = torch.argsort(torch.arange(x_c.shape[1], device=x.device).unsqueeze(0).repeat(x_c.shape[0], 1), dim=1)
 
-        # 3. Modality-Specific Blocks
+        # 4. Modality-Specific Blocks (Processing only VISIBLE tokens)
         for blk in self.modality_blocks[0]: x_c = blk(x_c)
         for blk in self.modality_blocks[1]: x_g = blk(x_g)
         for blk in self.modality_blocks[2]: x_s = blk(x_s)
 
-        # 4. Fusion
-        # Concat along channel dimension (B, N, 3*D)
+        # 5. Fusion
+        # Concat along channel dimension (B, len_keep, 3*D)
         x_fused = torch.cat([x_c, x_g, x_s], dim=2)
         x = self.fusion_proj(x_fused)
-
-        # 5. Masking
-        x, mask, ids_restore = self.random_masking(x, mask_ratio)
 
         # 6. Append CLS Token
         cls_token = self.cls_token + self.pos_embed[:, :1, :]

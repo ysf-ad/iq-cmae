@@ -41,12 +41,14 @@ class ItalySigRawDataset(Dataset):
         cache_dir: Optional[str] = None,
         split: str = "train", # train, val, test, or all
         class_map: Optional[Dict[str, int]] = None,
+        label_depth: int = 1, # 1 = parent, 2 = grandparent, etc.
     ):
         self.data_root = data_root
         self.image_size = image_size
         self.trim_leading_zeros_flag = trim_leading_zeros
         self.expand_short_samples_flag = expand_short_samples
         self.min_length = min_length
+        self.label_depth = label_depth
         
         # Noise configuration
         self.teacher_noise_std = teacher_noise_std
@@ -135,10 +137,13 @@ class ItalySigRawDataset(Dataset):
         root_path = Path(root)
         
         for file_path in root_path.rglob('*.sigmf-data'):
-            # Assume parent folder is class name for now, or use metadata
-            # ITALYSIG structure might vary, but let's assume class/file.sigmf-data
-            # or just use the folder name as the label
-            label = file_path.parent.name
+            # Use label_depth to determine label
+            # depth=1 -> parent, depth=2 -> grandparent
+            try:
+                label = file_path.parents[self.label_depth - 1].name
+            except IndexError:
+                # Fallback if depth is too large
+                label = file_path.parent.name
             
             samples.append({
                 'file_path': str(file_path),

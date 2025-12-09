@@ -11,6 +11,16 @@ from tqdm import tqdm
 
 # Imports
 from models.iqcmae_model import IQCMAE
+# Backward compatibility with old checkpoints
+import models.iqcmae_model
+sys.modules['models.corrected_proper_cmae'] = models.iqcmae_model
+sys.modules['iq_cmae'] = sys.modules[__name__]
+sys.modules['iq_cmae.models'] = models
+sys.modules['iq_cmae.models.corrected_proper_cmae'] = models.iqcmae_model
+sys.modules['iq_cmae.models.iqcmae_model'] = models.iqcmae_model
+
+models.iqcmae_model.CorrectedProperCMAE = models.iqcmae_model.IQCMAE
+
 from data.ne_data_raw_dataset import NEDataRawDataset
 from data.italysig_raw_dataset import ItalySigRawDataset
 
@@ -99,7 +109,7 @@ def main(args):
     # Load Model
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
     
-    model = CorrectedProperCMAE(
+    model = IQCMAE(
         img_size=224,
         patch_size=16,
         in_chans=6,
@@ -111,13 +121,11 @@ def main(args):
         decoder_num_heads=3,
         mlp_ratio=4.,
         norm_layer=nn.LayerNorm,
-        
-        # Important: These must match training for correct architecture
-        shared_layers=args.s, 
-        fusion_type=args.fusion_type,
+        norm_pix_loss=False,
         contrastive_last_k=args.k,
-    )
-    model.to(device)
+        shared_layers=args.s,
+        fusion_type=args.fusion_type
+    ).to(device)
     
     # Load Weights
     state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
@@ -228,7 +236,7 @@ def main(args):
     y_test_mapped = torch.tensor([label_map[y.item()] for y in y_test], device=device)
     
     # Train Probe
-    acc = train_linear_probe(X_train, y_train_mapped, X_test, y_test_mapped, device, len(unique_labels))
+    acc = train_linear_probe(X_train, y_train_mapped, X_test, y_test_mapped, device, len(unique_labels), epochs=args.epochs)
     print(f"Test Accuracy: {acc*100:.2f}%")
 
 if __name__ == '__main__':
@@ -239,6 +247,7 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='cuda', type=str)
     parser.add_argument('--shots', default=10, type=int, help='Shots per class (-1 for full)')
     parser.add_argument('--subset_ratio', default=0.2, type=float, help='Subset ratio for feature extraction')
+    parser.add_argument('--epochs', default=100, type=int, help='Linear probe training epochs')
     
     # Model Args (Must match training)
     parser.add_argument('--s', default=9, type=int, help='Shared layers')

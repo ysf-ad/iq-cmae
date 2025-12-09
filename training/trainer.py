@@ -80,6 +80,8 @@ class IQCMAE_Trainer:
                       f"MAE: {mae_loss.item():.4f} "
                       f"Contrastive: {contrastive_loss.item():.4f}")
         
+        if num_batches == 0:
+            return {'loss': 0.0}
         return {'loss': total_loss / num_batches}
 
     def evaluate(self, epoch: int) -> Dict[str, float]:
