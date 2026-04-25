@@ -22,7 +22,7 @@ Ensure your dataset is located in `ne-data/` or specify the path using the `--da
 The `train.py` script serves as the unified entry point for training both the Unified Baseline and Mid-Fusion models.
 
 ### 1. Unified Baseline (CW=0)
-Train a standard MAE-style model with early fusion (Unified Encoder).
+Train a standard MAE-style model with early fusion (Unified Encoder); use this direct MAE configuration when you need the plain MAE baseline.
 ```bash
 python train.py \
   --cw 0 --s 0 --k 0 \
