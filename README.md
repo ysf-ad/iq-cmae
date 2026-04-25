@@ -53,20 +53,76 @@ The `evaluate.py` script performs Linear Probing evaluation on trained checkpoin
 python evaluate.py \
   --checkpoint outputs/mid_fusion_optimal/checkpoint-99.pth \
   --shots 10 \
-  --batch_size 64
+  --bandwidth "5 GHz Bandwidth"
 ```
 
 **Key Arguments:**
 *   `--checkpoint`: Path to the model checkpoint.
 *   `--shots`: Number of samples per class for linear probing (default: 10). Use -1 for full dataset.
+*   `--bandwidth`: Optional bandwidth filter for THz evaluation.
+
+### Evaluation With Latency Measurement
+
+`evaluate.py` can also report encoder latency before feature extraction. This is useful when you want accuracy and inference timing from the same entry point.
+
+```bash
+python evaluate.py \
+  --checkpoint outputs/mid_fusion_optimal/checkpoint-99.pth \
+  --shots 10 \
+  --bandwidth "5 GHz Bandwidth" \
+  --measure_latency \
+  --use_cuda_graph \
+  --latency_warmup_iters 20 \
+  --latency_timing_iters 100 \
+  --latency_out outputs/eval_latency.json
+```
+
+Additional latency-related arguments:
+*   `--measure_latency`: Run an encoder forward-pass latency measurement before linear probing.
+*   `--use_cuda_graph`: Also benchmark CUDA graph replay latency on GPU.
+*   `--latency_warmup_iters`: Warmup iterations for the latency path.
+*   `--latency_timing_iters`: Timed iterations for the latency path.
+*   `--latency_out`: Optional JSON output path for the latency results.
+
+The latency JSON includes:
+*   eager milliseconds per batch and per sample
+*   eager throughput
+*   optional CUDA-graph milliseconds per batch and per sample
+*   optional CUDA-graph throughput and speedup
+*   a max-absolute-difference check between eager and CUDA-graph encoder outputs
+
+### Standalone CUDA-Graph Benchmarks
+
+For more focused latency studies, the repo also includes two standalone benchmark scripts:
+
+1. Encoder-only IQ-CMAE benchmark:
+```bash
+python iq_cmae/benchmark_iqcmae.py \
+  --checkpoint outputs/mid_fusion_optimal/checkpoint-99.pth \
+  --device cuda \
+  --cuda_graph \
+  --output outputs/benchmark_iqcmae.json
+```
+
+2. Raw-IQ preprocessing benchmark:
+```bash
+python benchmark_cuda_graph_preprocess.py \
+  --data_root data/ne-data/5\ GHz\ Bandwidth \
+  --device cuda \
+  --output outputs/benchmark_preprocess.json
+```
+
+These scripts are intended for reproducible latency studies and reporting. The integrated `evaluate.py` latency path is the simpler option when you want timing and evaluation from the same workflow.
 
 ## 📂 Repository Structure
 
 *   `train.py`: Main training script.
 *   `evaluate.py`: Main evaluation script.
+*   `benchmark_cuda_graph_preprocess.py`: Raw-IQ preprocessing latency benchmark with CUDA-graph replay.
 *   `iq_cmae/`: Source code package.
-    *   `models/`: Model definitions (`CorrectedProperCMAE`).
+    *   `models/`: Model definitions (`IQCMAE`).
     *   `data/`: Data loading (`NEDataRawDataset`).
+    *   `benchmark_iqcmae.py`: Encoder-only IQ-CMAE latency benchmark.
 *   `research_archive/`: Archived research scripts and experiments.
 
 ## 📝 Citation

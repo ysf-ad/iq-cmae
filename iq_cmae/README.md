@@ -24,7 +24,8 @@ iq_cmae/
 │   └── modules.py              # Transformer blocks
 ├── training/                # Training utilities
 │   └── trainer.py              # Trainer class
-└── train.py                 # Main training script
+├── train.py                 # Main training script
+└── linear_probe.py          # Evaluation script
 ```
 
 ## Usage
@@ -54,14 +55,63 @@ python train.py \
 
 ### Linear Probing / Evaluation
 
-To evaluate the pre-trained model:
+Use the `iq_cmae/linear_probe.py` script to evaluate a pre-trained checkpoint:
 
-1.  **Load Weights**: Load the pre-trained encoder weights.
-2.  **Freeze Encoder**: Freeze all encoder parameters.
-3.  **Train Classifier**: Train a linear classifier (e.g., a single Linear layer) on top of the encoder's CLS token output.
-4.  **Datasets**: Use the standard training/test splits for NE-Data or ITALYSIG as described in the paper.
+```bash
+python iq_cmae/linear_probe.py \
+    --checkpoint outputs/train_run/checkpoint-99.pth \
+    --dataset_type ne_data_raw \
+    --data_path /path/to/dataset \
+    --shots 10 \
+    --subset_ratio 0.2 \
+    --device cuda
+```
 
-*Note: The `train.py` script is currently configured for pre-training. For evaluation, you can adapt the script to load weights and run a supervised training loop on the classifier head only.*
+**Arguments:**
+*   `--checkpoint`: Path to the pre-trained model checkpoint.
+*   `--shots`: Number of samples per class for few-shot evaluation (use `-1` for full dataset).
+*   `--subset_ratio`: Ratio of data to use for feature extraction (default: `0.2`).
+*   `--dataset_type`: `ne_data_raw` or `italysig`.
+
+The script will:
+1.  Load the pre-trained encoder.
+2.  Extract features (CLS tokens) from the dataset.
+3.  Train a linear classifier on the frozen features.
+4.  Report test accuracy.
+
+### Legacy Evaluation Entry Point With Latency
+
+The repo also includes `evaluate.py`, which can run the older linear-probing path and optionally measure encoder latency from the same command.
+
+```bash
+python evaluate.py \
+    --checkpoint outputs/train_run/checkpoint-99.pth \
+    --data_path /path/to/dataset \
+    --bandwidth "5 GHz Bandwidth" \
+    --shots 10 \
+    --device cuda \
+    --measure_latency \
+    --use_cuda_graph \
+    --latency_out outputs/eval_latency.json
+```
+
+Latency-specific options:
+*   `--measure_latency`: Run encoder latency measurement before feature extraction.
+*   `--use_cuda_graph`: Also benchmark CUDA graph replay latency on GPU.
+*   `--latency_warmup_iters`: Warmup iterations for the latency path.
+*   `--latency_timing_iters`: Timed iterations for the latency path.
+*   `--latency_out`: Optional JSON path for latency results.
+
+The latency output reports eager timing by default, and when CUDA graphs are enabled it also reports replay timing, speedup, and a max-absolute-difference check between eager and graph outputs.
+
+### Standalone CUDA-Graph Benchmarks
+
+For benchmark-focused runs, use:
+
+```bash
+python benchmark_cuda_graph_preprocess.py --device cuda --output outputs/preprocess_latency.json
+python iq_cmae/benchmark_iqcmae.py --checkpoint outputs/train_run/checkpoint-99.pth --device cuda --cuda_graph --output outputs/encoder_latency.json
+```
 
 ## Architecture Details
 
@@ -106,4 +156,4 @@ This codebase supports the datasets detailed and referenced in the paper:
     }
     ```
 
-*Note: This repository contains only the code. Please refer to the paper for data access.*
+*Note: This repository contains only the code. Please refer to the references for data access.*
