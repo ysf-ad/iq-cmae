@@ -2,6 +2,8 @@
 
 This repository contains the official implementation of **IQ-CMAE**, a self-supervised learning framework for Radio Frequency (RF) sensing that leverages cross-modal masking across Constellation, Gramian Angular Field (GAF), and Spectrogram representations.
 
+In addition to training and linear-probe evaluation, the repo includes integrated encoder-latency measurement and CUDA-graph benchmarking so you can validate both representation quality and deployment-oriented inference performance from the same codebase.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -22,7 +24,7 @@ Ensure your dataset is located in `ne-data/` or specify the path using the `--da
 The `train.py` script serves as the unified entry point for training both the Unified Baseline and Mid-Fusion models.
 
 ### 1. Unified Baseline (CW=0)
-Train a standard MAE-style model with early fusion (Unified Encoder); use this direct MAE configuration when you need the plain MAE baseline.
+Train a standard MAE-style model with early fusion (Unified Encoder); use MAE directly through this configuration when you need the plain MAE baseline.
 ```bash
 python train.py \
   --cw 0 --s 0 --k 0 \
