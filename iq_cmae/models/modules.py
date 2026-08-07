@@ -10,7 +10,7 @@ class TransformerBlock(nn.Module):
         super().__init__()
         self.block = Block(
             dim=dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias,
-            drop=drop, attn_drop=attn_drop, drop_path=drop_path, act_layer=act_layer, norm_layer=norm_layer
+            proj_drop=drop, attn_drop=attn_drop, drop_path=drop_path, act_layer=act_layer, norm_layer=norm_layer
         )
 
     def forward(self, x):

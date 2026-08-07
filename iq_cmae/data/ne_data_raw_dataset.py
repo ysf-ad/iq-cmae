@@ -11,8 +11,9 @@ import json
 import numpy as np
 import torch
 from pathlib import Path
+from typing import Optional, List, Dict, Any, Tuple
 from torch.utils.data import Dataset
-from utils.iq_extractor import extract_iq_data, parse_sigmf_meta
+from ..utils.iq_extractor import extract_iq_data, parse_sigmf_meta
 from .discovery import discover_samples, apply_voltage_split, apply_subset_sampling, compute_noise_seed
 from .caching import DataCache
 from .transforms import (
@@ -289,14 +290,14 @@ class NEDataRawDataset(Dataset):
         return self._combine_modalities(modalities)
 
     def _combine_modalities(self, modalities: Dict[str, np.ndarray]) -> np.ndarray:
-        parts = []
-        if self.include_constellation: parts.append(modalities['constellation'])
-        if self.include_gaf: parts.append(modalities['gaf'])
-        if self.include_spectrogram: parts.append(modalities['spectrogram'])
-        
-        if not parts:
-            return np.zeros((1, self.image_size, self.image_size), dtype=np.float32)
-            
+        zeros = lambda channels: np.zeros(
+            (channels, self.image_size, self.image_size), dtype=np.float32
+        )
+        parts = [
+            modalities['constellation'] if self.include_constellation else zeros(3),
+            modalities['gaf'] if self.include_gaf else zeros(2),
+            modalities['spectrogram'] if self.include_spectrogram else zeros(1),
+        ]
         return np.concatenate(parts, axis=0)
 
     def _add_iq_noise(self, iq_data: np.ndarray, sample: Dict[str, Any], is_teacher: bool) -> np.ndarray:
@@ -332,7 +333,8 @@ class NEDataRawDataset(Dataset):
             noise_power = signal_power / (10**(snr/10))
             scale = np.sqrt(noise_power)
         else:
-            scale = std * self._power_level_scale(sample['power_level'])
+            signal_scale = float(np.std(iq_data)) if self.scale_noise_by_power else 1.0
+            scale = std * signal_scale
 
         return iq_data + noise * scale
 

@@ -40,8 +40,12 @@ def create_constellation_image(iq_data: np.ndarray, image_size: int = 224) -> np
         else:
             raise ValueError(f"iq_data must be 2xN or Nx2, got {iq_data.shape}")
 
-    I = iq_data[0]
-    Q = iq_data[1]
+    complex_signal = iq_data[0] + 1j * iq_data[1]
+    complex_signal = (
+        complex_signal - np.mean(complex_signal)
+    ) / (np.std(complex_signal) + 1e-8)
+    I = np.real(complex_signal)
+    Q = np.imag(complex_signal)
 
     # Fixed range based on standard deviation
     range_val = 2.0
@@ -49,12 +53,11 @@ def create_constellation_image(iq_data: np.ndarray, image_size: int = 224) -> np
 
     # 1) 2D Histogram
     H, _, _ = np.histogram2d(I, Q, bins=bins, range=[[-range_val, range_val], [-range_val, range_val]])
-    H = H.T  # Transpose to match image coordinates
-
     # 2) Exponential Smoothing
-    kernel_size = 5
+    kernel_size = 21
     kernel = create_exponential_kernel(kernel_size, decay_rate=1.0)
-    H_smooth = signal.convolve2d(H, kernel, mode='same')
+    from scipy.ndimage import convolve
+    H_smooth = convolve(H, kernel, mode='constant', cval=0.0)
 
     # 3) Multi-scale Gaussian Blur (3 channels)
     from scipy.ndimage import gaussian_filter
@@ -63,11 +66,7 @@ def create_constellation_image(iq_data: np.ndarray, image_size: int = 224) -> np
     for sigma in sigmas:
         ch = gaussian_filter(H_smooth, sigma=sigma)
         # Normalize per channel
-        ch_min, ch_max = ch.min(), ch.max()
-        if ch_max > ch_min:
-            ch = (ch - ch_min) / (ch_max - ch_min)
-        else:
-            ch = np.zeros_like(ch)
+        ch = ch / (ch.max() + 1e-8)
         channels.append(ch)
 
     img = np.stack(channels, axis=0)  # (3, H, W)

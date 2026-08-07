@@ -17,17 +17,19 @@ pip install -r requirements.txt
 ```
 
 ### Data Preparation
-Ensure your dataset is located in `ne-data/` or specify the path using the `--data_root` argument.
+Ensure your dataset is located in `data/ne-data/` or specify its location with
+`--data_path`.
 
 ## 🏃 Training
 
 The `train.py` script serves as the unified entry point for training both the Unified Baseline and Mid-Fusion models.
 
 ### 1. Unified Baseline (CW=0)
-Train a standard MAE-style model with early fusion (Unified Encoder); use MAE directly through this configuration when you need the plain MAE baseline.
+Train a standard MAE-style model with early fusion (all 12 encoder blocks are
+shared); use this configuration for the plain MAE baseline.
 ```bash
 python train.py \
-  --cw 0 --s 0 --k 0 \
+  --cw 0 --s 12 --k 0 \
   --output_dir outputs/unified_baseline \
   --epochs 100 --batch_size 64
 ```
@@ -37,13 +39,21 @@ Train the optimal IQ-CMAE model with mid-fusion, contrastive learning, and gradi
 ```bash
 python train.py \
   --cw 2.5 --s 9 --k 4 \
+  --dataset_type ne_data_raw \
+  --data_path data/ne-data \
+  --bandwidths "5 GHz Bandwidth" \
+  --modality_mask all \
+  --noise_std 0.6 --mask_ratio 0.75 --lr 1e-4 \
   --output_dir outputs/mid_fusion_optimal \
   --epochs 100 --batch_size 64
 ```
 
+`--noise_std` is relative to the standard deviation of each IQ trace. The
+command above is the 5 GHz pretraining configuration reported in the paper.
+
 **Key Arguments:**
 *   `--cw`: Contrastive Weight (default: 2.5)
-*   `--s`: Shared Layers (default: 9). Set to 0 for Unified.
+*   `--s`: Number of shared encoder blocks (12: early, 9: reported mid-fusion, 0: late).
 *   `--k`: Contrastive Gradient Stopping Layers (default: 4).
 *   `--subset_ratio`: Use a fraction of the data (e.g., 0.1) for fast debugging.
 

@@ -2,7 +2,6 @@ import os
 import torch
 import torch.nn as nn
 from typing import Optional, Dict, Any, Tuple
-from utils.iq_extractor import extract_iq_data
 
 class IQCMAE_Trainer:
     """
@@ -12,6 +11,7 @@ class IQCMAE_Trainer:
     def __init__(self, 
                  model: nn.Module, 
                  optimizer: torch.optim.Optimizer, 
+                 scheduler: Optional[Any],
                  data_loader_train: torch.utils.data.DataLoader, 
                  data_loader_val: Optional[torch.utils.data.DataLoader], 
                  device: torch.device, 
@@ -24,6 +24,7 @@ class IQCMAE_Trainer:
         
         self.model = model
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.data_loader_train = data_loader_train
         self.data_loader_val = data_loader_val
         self.device = device
@@ -32,12 +33,15 @@ class IQCMAE_Trainer:
         self.start_epoch = start_epoch
         self.print_freq = print_freq
         self.args = args
-        self.scaler = torch.cuda.amp.GradScaler()
+        self.amp_enabled = self.device.type == 'cuda'
+        self.scaler = torch.amp.GradScaler('cuda', enabled=self.amp_enabled)
+        self.optimizer_stepped = False
         self.writer = writer
 
     def train(self):
         """Run full training loop."""
         for epoch in range(self.start_epoch, self.epochs):
+            self.model.update_momentum(epoch, self.epochs)
             train_stats = self.train_one_epoch(epoch)
             
             val_stats = {}
@@ -46,6 +50,9 @@ class IQCMAE_Trainer:
                 print(f"Epoch {epoch}: Train Loss {train_stats['loss']:.4f} | Val Loss {val_stats['loss']:.4f}")
             else:
                 print(f"Epoch {epoch}: Train Loss {train_stats['loss']:.4f}")
+
+            if self.scheduler is not None and self.optimizer_stepped:
+                self.scheduler.step()
             
             # Save checkpoint
             if self.output_dir:
@@ -54,6 +61,7 @@ class IQCMAE_Trainer:
     def train_one_epoch(self, epoch: int) -> Dict[str, float]:
         """Train for one epoch."""
         self.model.train()
+        self.optimizer_stepped = False
         total_loss = 0
         num_batches = len(self.data_loader_train)
         
@@ -63,14 +71,16 @@ class IQCMAE_Trainer:
             
             self.optimizer.zero_grad()
             
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast(self.device.type, enabled=self.amp_enabled):
                 # Model forward pass
                 # Returns: loss, mae_loss, contrastive_loss, pred, mask
                 loss, mae_loss, contrastive_loss, _, _ = self.model(clean_imgs, noisy_imgs)
             
             self.scaler.scale(loss).backward()
+            scale = self.scaler.get_scale()
             self.scaler.step(self.optimizer)
             self.scaler.update()
+            self.optimizer_stepped |= self.scaler.get_scale() >= scale
             
             total_loss += loss.item()
             
@@ -92,7 +102,7 @@ class IQCMAE_Trainer:
             for i, samples in enumerate(self.data_loader_val):
                 clean_imgs, noisy_imgs = self._unpack_samples(samples)
 
-                with torch.cuda.amp.autocast():
+                with torch.amp.autocast(self.device.type, enabled=self.amp_enabled):
                     loss, _, _, _, _ = self.model(clean_imgs, noisy_imgs)
                 
                 total_loss += loss.item()

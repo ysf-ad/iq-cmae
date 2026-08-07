@@ -3,8 +3,9 @@ import json
 import numpy as np
 import torch
 from pathlib import Path
+from typing import Optional, List, Dict, Any, Tuple
 from torch.utils.data import Dataset
-from utils.iq_extractor import extract_iq_data
+from ..utils.iq_extractor import extract_iq_data
 from .caching import DataCache
 from .transforms import (
     create_spectrogram_custom,
@@ -205,7 +206,7 @@ class ItalySigRawDataset(Dataset):
         if self.include_constellation: parts.append(modalities['constellation'])
         if self.include_gaf: parts.append(modalities['gaf'])
         if self.include_spectrogram: parts.append(modalities['spectrogram'])
-        
+
         if not parts: return np.zeros((1, self.image_size, self.image_size), dtype=np.float32)
         return np.concatenate(parts, axis=0)
 

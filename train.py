@@ -14,10 +14,10 @@ sys.path.append('iq_cmae')
 from iq_cmae.models.iqcmae_model import CorrectedProperCMAE
 from iq_cmae.data.ne_data_raw_dataset import NEDataRawDataset
 from iq_cmae.data.italysig_raw_dataset import ItalySigRawDataset
-from iq_cmae.training.trainer import ImprovedCMAE_Trainer as Trainer
+from iq_cmae.training.trainer import IQCMAE_Trainer as Trainer
 
 def get_args_parser():
-    parser = argparse.ArgumentParser('IQ-CMAE Training', add_help=False)
+    parser = argparse.ArgumentParser('IQ-CMAE Training')
     
     # Primary Hyperparameters
     parser.add_argument('--cw', default=2.5, type=float,
@@ -25,15 +25,15 @@ def get_args_parser():
     parser.add_argument('--k', default=4, type=int,
                         help='Contrastive last k layers (gradient stop / early exit)')
     parser.add_argument('--s', default=9, type=int,
-                        help='Shared layers (0=Unified, >0=Mid-Fusion)')
+                        help='Shared encoder blocks (12=early, 9=mid, 0=late)')
     
     # Training Config
     parser.add_argument('--batch_size', default=64, type=int,
                         help='Batch size per GPU')
     parser.add_argument('--epochs', default=100, type=int)
     parser.add_argument('--warmup_epochs', default=10, type=int)
-    parser.add_argument('--blr', default=1.5e-4, type=float,
-                        help='base learning rate: absolute_lr = base_lr * total_batch_size / 256')
+    parser.add_argument('--lr', default=1e-4, type=float,
+                        help='absolute AdamW learning rate')
     parser.add_argument('--weight_decay', default=0.05, type=float)
     
     # Model Config
@@ -69,7 +69,7 @@ def get_args_parser():
     
     # Noise Config
     parser.add_argument('--noise_std', default=0.6, type=float,
-                        help='Standard deviation of noise for contrastive pairs')
+                        help='Teacher noise relative to each IQ trace standard deviation')
     parser.add_argument('--teacher_noise_snr_db', default=None, type=float,
                         help='SNR dB for teacher noise (overrides noise_std)')
     parser.add_argument('--student_noise_std', default=0.0, type=float,
@@ -78,8 +78,10 @@ def get_args_parser():
                         help='SNR dB for student noise')
     parser.add_argument('--subset_ratio', default=1.0, type=float,
                         help='Ratio of data to use (for fast debugging/verification)')
-    parser.add_argument('--modality_mask', default=None, type=str,
-                        help='Modality mask (e.g. "constellation+gaf")')
+    parser.add_argument('--bandwidths', nargs='+',
+                        default=['5 GHz Bandwidth', '10 GHz Bandwidth', '20 GHz Bandwidth'])
+    parser.add_argument('--modality_mask', default='all', type=str,
+                        choices=['all', 'constellation', 'gaf', 'spectrogram'])
     parser.add_argument('--cache_dir', default=None, type=str,
                         help='Cache directory')
     
@@ -109,7 +111,7 @@ def main(args):
             student_noise_std=args.student_noise_std,
             student_noise_snr_db=args.student_noise_snr_db,
             subset_ratio=args.subset_ratio,
-            modality_mask="constellation+gaf+spectrogram",
+            modality_mask=args.modality_mask,
             cache_dir=args.cache_dir,
             seed=args.seed
         )
@@ -121,14 +123,14 @@ def main(args):
             teacher_noise_std=0.0, # Clean for validation
             student_noise_std=0.0,
             subset_ratio=args.subset_ratio,
-            modality_mask="constellation+gaf+spectrogram",
+            modality_mask=args.modality_mask,
             cache_dir=args.cache_dir,
             seed=args.seed + 1 # Different seed
         )
         
     else:
         # NE-Data Raw Dataset (Default)
-        bandwidths = ['5 GHz Bandwidth', '10 GHz Bandwidth', '20 GHz Bandwidth']
+        bandwidths = args.bandwidths
         
         # Training Datasets
         train_datasets = []
@@ -140,10 +142,10 @@ def main(args):
                 voltage_split="train",
                 subset_ratio=args.subset_ratio,
                 seed=args.seed,
-                teacher_noise_std=0.0, # Clean teacher
-                student_noise_std=args.noise_std, # Noisy student
-                modality_mask="constellation+gaf+spectrogram",
-                cache_dir=None # Explicitly disable caching
+                teacher_noise_std=args.noise_std, # Noisy momentum target
+                student_noise_std=0.0, # Clean masked online view
+                modality_mask=args.modality_mask,
+                cache_dir=args.cache_dir
             )
             train_datasets.append(ds)
         dataset_train = ConcatDataset(train_datasets)
@@ -158,10 +160,10 @@ def main(args):
                 voltage_split="eval_train", # Use eval_train for validation
                 subset_ratio=args.subset_ratio, # Use subset for faster validation
                 seed=args.seed,
-                teacher_noise_std=0.0,
-                student_noise_std=args.noise_std,
-                modality_mask="constellation+gaf+spectrogram",
-                cache_dir=None # Explicitly disable caching
+                teacher_noise_std=args.noise_std,
+                student_noise_std=0.0,
+                modality_mask=args.modality_mask,
+                cache_dir=args.cache_dir
             )
             val_datasets.append(ds)
         dataset_val = ConcatDataset(val_datasets)
@@ -212,21 +214,21 @@ def main(args):
         fusion_type=args.fusion_type,
         
         # Fixed
-        modality_mask="constellation+gaf+spectrogram"
+        modality_mask=args.modality_mask
     )
     
     model.to(device)
 
     # Optimizer
-    eff_batch_size = args.batch_size
-    lr = args.blr * eff_batch_size / 256
-    
     param_groups = [
         {'params': [p for n, p in model.named_parameters() if p.requires_grad and ('bias' not in n and 'norm' not in n)], 'weight_decay': args.weight_decay},
         {'params': [p for n, p in model.named_parameters() if p.requires_grad and ('bias' in n or 'norm' in n)], 'weight_decay': 0.0}
     ]
     
-    optimizer = torch.optim.AdamW(param_groups, lr=lr, betas=(0.9, 0.95))
+    optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=args.epochs
+    )
 
     # Create Output Directory
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
@@ -240,6 +242,7 @@ def main(args):
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
+        scheduler=scheduler,
         data_loader_train=data_loader_train,
         data_loader_val=data_loader_val,
         device=device,
